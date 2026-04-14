@@ -1,0 +1,200 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GOOEMETY DASSHH 🤑</title>
+<style>
+  body {
+    margin: 0;
+    background: #0a0a0a;
+    color: white;
+    text-align: center;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+  }
+  canvas {
+    background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);
+    display: block;
+    margin: 20px auto;
+    border: 4px solid #fff;
+  }
+  h1 { margin: 10px 0; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+<h1>GOOEMETY DASSHH 🤑</h1>
+<canvas id="game" width="600" height="250"></canvas>
+
+
+<script>
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+
+
+const GROUND_Y = 200;
+const CEILING_Y = 40;
+const PLAYER_X = 80;
+
+
+let y = 178, vy = 0, rotation = 0;
+let gravity = 0.6, score = 0, mode = "cube";
+let spikeX = 600, portalX = -100, inPortalPhase = false;
+let isMouseDown = false;
+
+
+document.addEventListener("keydown", e => { if (e.code === "Space") { isMouseDown = true; jump(); }});
+document.addEventListener("keyup", e => { if (e.code === "Space") isMouseDown = false; });
+document.addEventListener("mousedown", () => { isMouseDown = true; jump(); });
+document.addEventListener("mouseup", () => isMouseDown = false);
+
+
+function jump() {
+  if (mode === "cube" && y >= GROUND_Y - 22) vy = -11;
+}
+
+
+function restartGame() {
+  y = 178; vy = 0; score = 0; rotation = 0;
+  mode = "cube"; spikeX = 600; portalX = -100;
+  inPortalPhase = false;
+}
+
+
+function loop() {
+  score += 0.05;
+
+
+  // --- MODE SPECIFIC PHYSICS ---
+  if (mode === "cube") {
+    vy += gravity;
+    y += vy;
+    if (y > GROUND_Y - 22) {
+      y = GROUND_Y - 22; vy = 0;
+      rotation = Math.round(rotation / 90) * 90;
+    } else { rotation += 5; }
+  } 
+  else if (mode === "ship") {
+    // Ship: Smooth gravity physics
+    vy += isMouseDown ? -0.55 : 0.55;
+    vy *= 0.94; 
+    y += vy;
+    rotation = vy * 2.5;
+  } 
+  else if (mode === "wave") {
+    // Wave: Sharp 45-degree diagonal movement (Blast Processing style)
+    let waveSpeed = 4.5;
+    y += isMouseDown ? -waveSpeed : waveSpeed;
+    rotation = isMouseDown ? -45 : 45;
+  }
+
+
+  // --- BOUNDARIES & COLLISION ---
+  // Die if hitting ground or ceiling in Ship/Wave
+  if (mode !== "cube") {
+    if (y < CEILING_Y || y > GROUND_Y - 22) return restartGame();
+  }
+
+
+  // Move Obstacles
+  spikeX -= 8;
+  if (spikeX < -100) spikeX = 650 + Math.random() * 200;
+
+
+  // Portal Logic (Cycle modes)
+  if (Math.floor(score) % 20 === 0 && score > 5 && !inPortalPhase) {
+    inPortalPhase = true;
+    portalX = 700;
+  }
+  if (inPortalPhase) {
+    portalX -= 8;
+    if (Math.abs(portalX - PLAYER_X) < 20) {
+      const modes = ["ship", "wave", "cube"];
+      let next = modes[Math.floor(Math.random() * modes.length)];
+      while(next === mode) next = modes[Math.floor(Math.random() * modes.length)];
+      mode = next;
+      inPortalPhase = false;
+    }
+  }
+
+
+  // --- HITBOXES ---
+  // Floor Spike Collision
+  if (spikeX < PLAYER_X + 18 && spikeX > PLAYER_X - 18) {
+    if (y > GROUND_Y - 45) return restartGame();
+  }
+  // Ceiling Spike Collision (Ship/Wave only)
+  if (mode !== "cube" && spikeX < PLAYER_X + 18 && spikeX > PLAYER_X - 18) {
+    if (y < CEILING_Y + 25) return restartGame();
+  }
+
+
+  // --- DRAWING ---
+  ctx.clearRect(0, 0, 600, 250);
+
+
+  // Draw Ground & Ceiling
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, GROUND_Y, 600, 50);
+  if (mode !== "cube") ctx.fillRect(0, 0, 600, CEILING_Y);
+  
+  ctx.strokeStyle = "#00ffff";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-1, GROUND_Y, 602, 2);
+  if (mode !== "cube") ctx.strokeRect(-1, CEILING_Y - 2, 602, 2);
+
+
+  // Draw Portal
+  if (inPortalPhase) {
+    ctx.fillStyle = "#ff00ff";
+    ctx.shadowBlur = 10; ctx.shadowColor = "#ff00ff";
+    ctx.fillRect(portalX, 0, 20, 250);
+    ctx.shadowBlur = 0;
+  }
+
+
+  // Draw Player
+  ctx.save();
+  ctx.translate(PLAYER_X + 11, y + 11);
+  ctx.rotate(rotation * Math.PI / 180);
+  ctx.fillStyle = (mode === "cube") ? "#00ffff" : (mode === "ship" ? "#ffff00" : "#ff0055");
+  ctx.fillRect(-11, -11, 22, 22);
+  ctx.strokeStyle = "white";
+  ctx.strokeRect(-11, -11, 22, 22);
+  ctx.restore();
+
+
+  // Draw Spikes (Floor)
+  ctx.fillStyle = "#ff3333";
+  drawSpike(spikeX, GROUND_Y, -1);
+  
+  // Draw Spikes (Ceiling - only for Ship/Wave)
+  if (mode !== "cube") {
+    drawSpike(spikeX + 40, CEILING_Y, 1);
+  }
+
+
+  // UI
+  ctx.fillStyle = "white";
+  ctx.font = "bold 14px Arial";
+  ctx.fillText("SCORE: " + Math.floor(score), 20, mode === "cube" ? 25 : 55);
+  ctx.fillText("MODE: " + mode.toUpperCase(), 500, mode === "cube" ? 25 : 55);
+
+
+  requestAnimationFrame(loop);
+}
+
+
+function drawSpike(x, y, dir) {
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + 15, y + (35 * dir));
+  ctx.lineTo(x + 30, y);
+  ctx.fill();
+}
+
+
+restartGame();
+loop();
+</script>
+</body>
+</html>
